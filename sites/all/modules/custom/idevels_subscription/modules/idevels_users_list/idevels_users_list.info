@@ -1,0 +1,9 @@
+name = Idevels users list
+description = Module for provide a view with users and their plans.
+package = InternetDevels
+core = 7.x
+
+dependencies[] = idevels_subscription
+
+files[] = handlers/idevels_ul_handler_user_plans.inc
+files[] = handlers/idevels_ul_handler_plan_name_select.inc

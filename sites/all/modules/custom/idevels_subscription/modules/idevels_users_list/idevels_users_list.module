@@ -1,0 +1,52 @@
+<?php
+/**
+ * @file
+ * Main file of module.
+ */
+
+/**
+ * Implements hook_views_api().
+ */
+function idevels_users_list_views_api() {
+  return array(
+    'api' => 3.0,
+  );
+}
+
+/**
+ * Implements hook_views_data().
+ */
+function idevels_users_list_views_data() {
+  $data['users']['user_plans'] = array(
+    'group' => t('User'),
+    'real field' => 'uid',
+    'field' => array(
+      'title' => t('User plans'),
+      'help' => t('User available plans'),
+      'handler' => 'idevels_ul_handler_user_plans',
+    ),
+  );
+  $data['subscription']['name_select'] = array(
+    'group' => t('Subscription plan'),
+    'real field' => 'name',
+    'filter' => array(
+      'title' => t('User plans select'),
+      'help' => t('Selectlist filter for user plans'),
+      'real field' => 'name',
+      'handler' => 'idevels_ul_handler_plan_name_select',
+    ),
+  );
+  return $data;
+}
+
+/**
+ * Function to get all subscription names.
+ */
+function idevels_ul_get_subscription_names() {
+  $subscriptions = entity_load('subscription', FALSE);
+  $subs_names = array();
+  foreach ($subscriptions as $one_sub) {
+    $subs_names[$one_sub->name] = $one_sub->name;
+  }
+  return $subs_names;
+}

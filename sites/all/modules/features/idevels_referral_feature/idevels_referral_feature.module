@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the Idevels referral feature feature.
+ */
+
+include_once 'idevels_referral_feature.features.inc';

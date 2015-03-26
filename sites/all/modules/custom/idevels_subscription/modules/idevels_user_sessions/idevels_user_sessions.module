@@ -1,0 +1,57 @@
+<?php
+/**
+ * @file
+ * Main file of module.
+ */
+
+/**
+ * Implements hook_entity_info().
+ */
+function idevels_user_sessions_entity_info() {
+  return array(
+    'id_user_sessions' => array(
+      'label' => t('Idevels user sessions'),
+      'entity class' => 'IdUserSessions',
+      'controller class' => 'IdUserSessionsController',
+      'base table' => 'id_user_sessions',
+      'fieldable' => TRUE,
+      'views controller class' => 'IdUserSessionsViewsController',
+      'entity keys' => array(
+        'id' => 'rid',
+      ),
+      'access callback' => 'idevels_user_sessions_us_access',
+      'bundles' => array(),
+      'module' => 'idevels_user_sessions',
+    ),
+  );
+}
+
+/**
+ * Implements hook_entity_property_info().
+ */
+function idevels_user_sessions_entity_property_info() {
+  $info = array();
+  $properties = &$info['id_user_sessions']['properties'];
+  $properties['rid'] = array(
+    'label' => t('Report ID'),
+    'type' => 'integer',
+    'description' => t('Report ID.'),
+    'schema field' => 'rid',
+  );
+  $properties['uid'] = array(
+    'label' => t('User ID'),
+    'type' => 'integer',
+    'description' => t('User ID.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'required' => TRUE,
+    'schema field' => 'uid',
+  );
+  return $info;
+}
+
+/**
+ * Access callback for user sessions entity.
+ */
+function idevels_user_sessions_us_access($op, $task, $account = NULL, $entity_type = NULL) {
+  return TRUE;
+}

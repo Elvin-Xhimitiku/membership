@@ -1,0 +1,43 @@
+<?php
+
+/**
+ * @file
+ * Install file of module.
+ */
+
+/**
+ * Implements hook_schema_alter().
+ */
+function idevels_subscription_commerce_schema_alter(&$schema) {
+  $schema['subscription']['fields']['product_id'] = array(
+    'type' => 'int',
+    'not null' => FALSE,
+    'default' => NULL,
+    'description' => 'Product id added to subscription',
+  );
+}
+
+/**
+ * Implements hook_install().
+ */
+function idevels_subscription_commerce_install() {
+  $schema = drupal_get_schema('subscription');
+  db_add_field('subscription', 'product_id', $schema['fields']['product_id']);
+
+  $subscriptions = entity_load('subscription');
+  foreach ($subscriptions as $subscription) {
+    idevels_sc_create_product($subscription);
+  }
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function idevels_subscription_commerce_uninstall() {
+  $subscriptions = entity_load('subscription');
+  foreach ($subscriptions as $subscription) {
+    $product = commerce_product_load_by_sku("subscription-{$subscription->sid}");
+    commerce_product_delete($product->product_id);
+  }
+  db_drop_field('subscription', 'product_id');
+}

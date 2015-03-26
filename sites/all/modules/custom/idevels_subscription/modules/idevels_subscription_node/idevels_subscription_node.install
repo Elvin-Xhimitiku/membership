@@ -1,0 +1,28 @@
+<?php
+/**
+ * @file
+ * Install file for module.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function idevels_subscription_node_install() {
+  db_insert('subscription')
+    ->fields(array(
+      'name' => 'Buy node separatly',
+      'type' => IDEVELS_SUBSCRIPTION_NODE_TYPE,
+      'price' => 0,
+      'updated' => REQUEST_TIME,
+    ))
+    ->execute();
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function idevels_subscription_node_uninstall() {
+  db_delete('subscription')
+    ->condition('sid', IDEVELS_SUBSCRIPTION_NODE_TYPE_SID)
+    ->execute();
+}

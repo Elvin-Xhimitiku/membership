@@ -1,0 +1,11 @@
+name = Idevels pick view
+description = Module for provide a report page for view pick action.
+package = InternetDevels
+core = 7.x
+
+dependencies[] = entity
+dependencies[] = idevels_subscription
+
+files[] = includes/idevels_pick_view.entity.inc
+files[] = includes/idevels_pick_view.controller.inc
+files[] = includes/idevels_pick_view_views.controller.inc

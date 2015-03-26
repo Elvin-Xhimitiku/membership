@@ -1,0 +1,63 @@
+<?php
+/**
+ * @file
+ * Install file of module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function idevels_subscription_access_schema() {
+  $schema['subscription_access'] = array(
+    'description' => 'Subscription access',
+    'fields' => array(
+      'said' => array(
+        'description' => 'Subscription Access ID.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'sid' => array(
+        'description' => 'Subscription ID.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'uid' => array(
+        'description' => 'User ID.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'status' => array(
+        'description' => '1 if active or 0.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'start_date' => array(
+        'description' => 'Updated date.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'end_date' => array(
+        'description' => 'Updated date.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'order_id' => array(
+        'description' => 'Updated date.',
+        'type' => 'int',
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'nid' => array(
+        'description' => 'Users can buy nodes separatly.',
+        'type' => 'int',
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+    ),
+    'primary key' => array('said'),
+  );
+
+  return $schema;
+}

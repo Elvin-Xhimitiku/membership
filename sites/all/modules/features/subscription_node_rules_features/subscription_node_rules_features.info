@@ -1,0 +1,17 @@
+name = Subscription node rules features
+description = Contain rules for create a product for pick if we can buy it separatly.
+core = 7.x
+package = Features
+dependencies[] = commerce
+dependencies[] = commerce_checkout
+dependencies[] = entity
+dependencies[] = idevels_subscription_node
+dependencies[] = rules
+features[features_api][] = api:2
+features[rules_config][] = rules_idevels_buy_pick_node_access
+features[rules_config][] = rules_idevels_create_pick_product
+features[rules_config][] = rules_idevels_disable_product_after_delete_node
+features[rules_config][] = rules_idevels_edit_disable_pick_product
+features[rules_config][] = rules_idevels_edit_enable_pick_product
+features[rules_config][] = rules_idevels_edit_pick_create_product
+features[rules_config][] = rules_idevels_edit_pick_product

@@ -1,0 +1,11 @@
+name = Idevels user sessions
+description = Module for provide a report page for user sessions view.
+package = InternetDevels
+core = 7.x
+
+dependencies[] = entity
+dependencies[] = idevels_subscription
+
+files[] = includes/idevels_user_sessions.entity.inc
+files[] = includes/idevels_user_sessions.controller.inc
+files[] = includes/idevels_user_sessions_views.controller.inc

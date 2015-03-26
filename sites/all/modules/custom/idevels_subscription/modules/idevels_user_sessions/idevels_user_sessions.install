@@ -1,0 +1,34 @@
+<?php
+/**
+ * @file
+ * Install file of module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function idevels_user_sessions_schema() {
+  $schema['id_user_sessions'] = array(
+    'description' => 'User sessions reports',
+    'fields' => array(
+      'rid' => array(
+        'description' => 'Report ID.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'uid' => array(
+        'description' => 'User ID.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'time' => array(
+        'description' => 'Unix timestamp.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('rid'),
+  );
+  return $schema;
+}

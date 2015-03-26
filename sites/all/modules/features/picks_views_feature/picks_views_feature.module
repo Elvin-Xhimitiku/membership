@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the Picks views feature feature.
+ */
+
+include_once 'picks_views_feature.features.inc';

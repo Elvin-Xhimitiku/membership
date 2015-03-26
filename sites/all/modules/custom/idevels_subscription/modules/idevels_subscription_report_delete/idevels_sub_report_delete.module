@@ -1,0 +1,85 @@
+<?php
+/**
+ * @file
+ * Main file of module.
+ */
+
+/**
+ * Implements hook_permission().
+ */
+function idevels_sub_report_delete_permission() {
+  return array(
+    'idevels sub report delete admin' => array(
+      'title' => t('Access to settings'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_menu().
+ */
+function idevels_sub_report_delete_menu() {
+
+  $items['admin/structure/reports/reports-settings'] = array(
+    'title' => 'Delete reports',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('idevels_sub_report_delete_config_form'),
+    'access arguments' => array('idevels sub report delete admin'),
+    'file' => 'idevels_sub_report_delete.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 20,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_cronapi().
+ */
+function idevels_sub_report_delete_cronapi() {
+  $items = array();
+
+  $items['idevels_sub_report_delete_add_items'] = array(
+    'description' => t('Cron function for add items to queue for delete'),
+    'callback' => 'idevels_sub_report_delete_add_items_cron_callback',
+    'rule' => '0 * * * *',
+    'arguments' => array(),
+    'file' => 'idevels_sub_report_delete.cron.inc',
+    'file path' => drupal_get_path('module', 'idevels_sub_report_delete'),
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_cron_queue_info().
+ */
+function idevels_sub_report_delete_cron_queue_info() {
+  $queues['idevelsSubReportsRemove'] = array(
+    'worker callback' => 'idevels_sub_report_delete_remove_queue_callback',
+    'time' => 60,
+  );
+  return $queues;
+}
+
+/**
+ * Queue callback for remove reports.
+ */
+function idevels_sub_report_delete_remove_queue_callback($item) {
+  // Delete pick view.
+  if (!empty($item['pick_view'])) {
+    entity_delete_multiple('pick_view', $item['pick_view']);
+  }
+  // Delete user sessions.
+  if (!empty($item['id_user_sessions'])) {
+    entity_delete_multiple('id_user_sessions', $item['id_user_sessions']);
+  }
+}
+
+/**
+ * Function for return time of old reports.
+ */
+function idevels_sub_report_get_old_time() {
+  $months = (int) variable_get('idevels_sub_report_delete_month', 3);
+  return strtotime("-{$months} month");
+}

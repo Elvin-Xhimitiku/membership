@@ -1,0 +1,242 @@
+<?php
+/**
+ * @file
+ * Main file of module.
+ */
+
+define('IDEVELS_SUBSCRIPTION_REGULAR', 1);
+define('IDEVELS_SUBSCRIPTION_STANDART', 2);
+define('IDEVELS_SUBSCRIPTION_PREMIUM', 3);
+define('IDEVELS_SUBSCRIPTION_FREE', 4);
+define('IDEVELS_SUBSCRIPTION_FREE_SID', 1);
+
+define('IDEVELS_SUBSCRIPTION_CATEGORY_VOC', 'pick_category');
+define('IDEVELS_SUBSCRIPTION_CONTENT_TYPE', 'pick');
+
+/**
+ * Implements hook_module_implements_alter().
+ */
+function idevels_subscription_module_implements_alter(&$implementations, $hook) {
+  // Call hook_menu_alter in the last for rewrite view paths.
+  if ($hook == 'menu_alter') {
+    $group = $implementations['idevels_subscription'];
+    unset($implementations['idevels_subscription']);
+    $implementations['idevels_subscription'] = $group;
+  }
+}
+
+/**
+ * Implements hook_entity_info().
+ */
+function idevels_subscription_entity_info() {
+  return array(
+    'subscription' => array(
+      'label' => t('Subscription plan'),
+      'entity class' => 'Subscription',
+      'controller class' => 'SubscriptionController',
+      'base table' => 'subscription',
+      'fieldable' => TRUE,
+      'views controller class' => 'IdevelsSubscriptionViewsController',
+      'entity keys' => array(
+        'id' => 'sid',
+      ),
+      'access callback' => 'idevels_subscription_subscription_access',
+      'bundles' => array(),
+      'module' => 'idevels_subscription',
+    ),
+  );
+}
+
+/**
+ * Implements hook_entity_property_info().
+ */
+function idevels_subscription_entity_property_info() {
+  $info = array();
+  // Add meta-data about the basic subscription properties.
+  $properties = &$info['subscription']['properties'];
+  $properties['sid'] = array(
+    'label' => t('Subscription ID'),
+    'type' => 'integer',
+    'description' => t('Subscription ID.'),
+    'schema field' => 'sid',
+    'required' => TRUE,
+  );
+  $properties['name'] = array(
+    'label' => t('Title'),
+    'description' => t("The name of the subscription."),
+    'setter callback' => 'entity_property_verbatim_set',
+    'schema field' => 'name',
+    'required' => TRUE,
+  );
+  $properties['type'] = array(
+    'label' => t('Type'),
+    'type' => 'integer',
+    'description' => t('The type of the subscription.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'required' => TRUE,
+    'schema field' => 'type',
+  );
+  $properties['description'] = array(
+    'label' => t('Description'),
+    'type' => 'text',
+    'description' => t('Description for subscription'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'schema field' => 'description',
+  );
+  $properties['category'] = array(
+    'label' => t('Category'),
+    'type' => 'taxonomy_term',
+    'description' => t('The tid of category.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'required' => TRUE,
+    'schema field' => 'category',
+  );
+  $properties['price'] = array(
+    'label' => t('Price'),
+    'type' => 'integer',
+    'description' => t('The price of the subscription.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'required' => TRUE,
+    'schema field' => 'price',
+  );
+  return $info;
+}
+
+/**
+ * Access callback for subscription entity.
+ */
+function idevels_subscription_subscription_access($op, $task, $account = NULL, $entity_type = NULL) {
+  return TRUE;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function idevels_subscription_permission() {
+  return array(
+    'ideves subscription admin' => array(
+      'title' => t('Administer subscriptions'),
+    ),
+    'ideves subscription view' => array(
+      'title' => t('Access to subscription view page'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_menu_alter().
+ */
+function idevels_subscription_menu_alter(&$items) {
+  $items['admin/structure/subscription/list'] = array(
+    'title' => 'Subscriptions',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+}
+
+/**
+ * Implements hook_menu().
+ */
+function idevels_subscription_menu() {
+  $items['subscription/%subscription'] = array(
+    'title callback' => 'idevels_subscription_title_callback',
+    'title arguments' => array(1, 'view'),
+    'page callback' => 'idevels_subscription_view_page',
+    'page arguments' => array(1),
+    'access arguments' => array('ideves subscription view'),
+    'file' => 'idevels_subscription.pages.inc',
+  );
+  $items['subscription/%subscription/view'] = array(
+    'title' => 'View',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+
+  $items['subscription/%subscription/edit'] = array(
+    'title' => 'Edit',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('idevels_subscription_edit_page_form', 1),
+    'access arguments' => array('ideves subscription admin'),
+    'type' => MENU_LOCAL_TASK,
+    'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+    'file' => 'idevels_subscription.pages.inc',
+  );
+
+  $items['admin/structure/subscription/new'] = array(
+    'title' => 'Create new plan',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('idevels_subscription_create_page_form'),
+    'access arguments' => array('ideves subscription admin'),
+    'file' => 'idevels_subscription.pages.inc',
+    'type' => MENU_LOCAL_TASK,
+    'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+    'weight' => 20,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function idevels_subscription_views_api() {
+  return array(
+    'api' => 3.0,
+  );
+}
+
+/**
+ * Load a subscription.
+ */
+function subscription_load($sid, $reset = FALSE) {
+  $subscriptions = subscription_load_multiple(array($sid), array(), $reset);
+  return reset($subscriptions);
+}
+
+/**
+ * Load a subscription multiple.
+ */
+function subscription_load_multiple($sids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('subscription', $sids, $conditions, $reset);
+}
+
+/**
+ * Save subscription.
+ */
+function subscription_save($subscription) {
+  entity_save('subscription', $subscription);
+}
+
+/**
+ * Title  callback for subscription pages.
+ */
+function idevels_subscription_title_callback($subscription, $type = 'view') {
+  switch ($type) {
+    case 'edit':
+      return t('Edit: @sub', array('@sub' => $subscription->name));
+
+    default:
+      return check_plain($subscription->name);
+  }
+}
+
+/**
+ * Function for return list of categories.
+ */
+function idevels_subscription_get_categories() {
+  $voc = taxonomy_vocabulary_machine_name_load(IDEVELS_SUBSCRIPTION_CATEGORY_VOC);
+  $terms = taxonomy_get_tree($voc->vid);
+  return $terms;
+}
+
+/**
+ * Function for check subscription for unable dublicates.
+ */
+function idevels_subscription_check_subscription($type, $category) {
+  return db_select('subscription', 's')
+  ->condition('s.type', $type)
+  ->condition('s.category', $category)
+  ->fields('s', array('sid'))
+  ->execute()
+  ->fetchField();
+}

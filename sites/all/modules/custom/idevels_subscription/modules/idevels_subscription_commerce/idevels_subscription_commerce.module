@@ -1,0 +1,415 @@
+<?php
+/**
+ * @file
+ * Main file of module.
+ */
+
+/**
+ * Implements hook_menu_alter().
+ */
+function idevels_subscription_commerce_menu_alter(&$items) {
+  $items['cart']['page callback'] = 'idevels_sc_cart_callback';
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function idevels_subscription_commerce_form_alter(&$form, &$form_state, $form_id) {
+  global $user;
+  if ($form_id == 'views_exposed_form' && isset($form['field_buy_separately_value'])) {
+    $form['field_buy_separately_value']['#options'][0] = 'No';
+    $form['field_buy_separately_value']['#options'][1] = 'Yes';
+  }
+
+  if ($form_id == 'idevels_subscription_edit_page_form') {
+    $form['#submit'][] = 'idevels_sc_edit_subscription_submit';
+  }
+
+  $regexp = '/^commerce_cart_add_to_cart_form_\d+$/';
+  if (preg_match($regexp, $form_id)) {
+    // Change 'Add to cart' value of submit.
+    $form['submit']['#value'] = t('Buy');
+    if (empty($form['product_id']['#value'])) {
+      return;
+    }
+    $product_id = $form['product_id']['#value'];
+
+    $access = new SubscriptionAccessClass($user);
+    $subs_accesses = $access->getSubscriptions(IDEVELS_SUBSCRIPTION_ACCESS_ACTIVE);
+    $product_ids_from_subs = array();
+    if (!empty($subs_accesses)) {
+      foreach ($subs_accesses as $sub_access) {
+        $subscription = entity_load('subscription', array($sub_access->sid));
+        if (!empty($subscription)) {
+          $product_ids_from_subs[] = $subscription[$sub_access->sid]->product_id;
+        }
+      }
+    }
+    // Do not render Buy button if user already bought the subscription.
+    if (in_array($product_id, $product_ids_from_subs)) {
+      unset($form['submit']);
+      $form['user_has_this_plan'] = array(
+        '#type' => 'markup',
+        '#markup' => t('You have bought this subscription already'),
+      );
+    }
+  }
+}
+
+/**
+ * Additional submit for creation and edition a subscription.
+ */
+function idevels_sc_edit_subscription_submit($form, &$form_state) {
+  if ($form['#form_id'] == 'idevels_subscription_edit_page_form') {
+    if (!empty($form['#subscription']->product_id)) {
+      $product = commerce_product_load($form['#subscription']->product_id);
+      $lang = field_language('commerce_product', $product, 'commerce_price');
+      $product->title = check_plain($form_state['values']['name']);
+      $product->commerce_price[$lang][0]['amount'] = check_plain($form_state['values']['price']) * 100;
+      commerce_product_save($product);
+    }
+  }
+}
+
+/**
+ * Function creates product added to subscription and adds product_id field.
+ */
+function idevels_sc_create_product($subscription) {
+  global $user;
+
+  // Creation of product added to subscription.
+  $product = commerce_product_new('product');
+  $product->sku = "subscription-{$subscription->sid}";
+  $product->title = $subscription->name;
+  $product->language = LANGUAGE_NONE;
+  $product->uid = $user->uid;
+  $product->status = 1;
+  $product->created = $product->changed = REQUEST_TIME;
+  $product->commerce_price = array(
+    LANGUAGE_NONE => array(
+      0 => array(
+        'amount' => $subscription->price * 100,
+        'currency_code' => 'USD',
+      ),
+    ),
+  );
+  commerce_product_save($product);
+
+  // Adding product id to subscription.
+  $subscription->product_id = $product->product_id;
+  $wrapper = entity_metadata_wrapper('subscription', $subscription);
+  $wrapper->save();
+}
+
+/**
+ * Implements hook_entity_property_info_alter().
+ */
+function idevels_subscription_commerce_entity_property_info_alter(&$info) {
+  $properties = &$info['subscription']['properties'];
+  $properties['product_id'] = array(
+    'label' => t('Product ID'),
+    'type' => 'commerce_product',
+    'description' => t('Product ID'),
+    'schema field' => 'product_id',
+  );
+}
+
+/**
+ * Implements hook_idevels_subscription_access_list().
+ */
+function idevels_subscription_commerce_idevels_subscription_access_list() {
+  return array(
+    'pick_node_access' => array(
+      'title' => t('Pick access'),
+      'check callback' => 'idevels_subscription_commerce_pick_check',
+    ),
+  );
+}
+
+/**
+ * Callback function for hook_idevels_subscription_access_list().
+ */
+function idevels_subscription_commerce_pick_check($node) {
+  global $user;
+  return idevels_sa_pick_check($node, $user);
+}
+
+/**
+ * Custom callback for cart page.
+ */
+function idevels_sc_cart_callback() {
+  global $user;
+  if ($order = commerce_cart_order_load($user->uid)) {
+    drupal_goto('checkout');
+  }
+  $output = array(
+    'output' => array(
+      '#type' => 'markup',
+      '#markup' => t('You did not buy any items yet.'),
+    ),
+  );
+  return $output;
+}
+
+/**
+ * Implements hook_field_access().
+ */
+function idevels_subscription_commerce_field_access($op, $field, $entity_type, $entity, $account) {
+  if ($entity_type == 'node' && $op == 'view' && !empty($entity)) {
+    $lang = field_language('node', $entity, 'field_buy_separately');
+    if (!empty($entity->field_buy_separately)) {
+      $buy_separately = $entity->field_buy_separately[$lang][0]['value'];
+      if (!$buy_separately) {
+        if ($field['field_name'] == 'field_price' || $field['field_name'] == 'field_pick_product') {
+          return FALSE;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_views_default_views_alter().
+ */
+function idevels_subscription_commerce_views_default_views_alter(&$views) {
+  if (array_key_exists('commerce_user_orders', $views)) {
+    // Replacing default user orders view with custom.
+    $view = new view();
+    $view->name = 'commerce_user_orders';
+    $view->description = 'Display a list of completed orders for a user.';
+    $view->tag = 'commerce';
+    $view->base_table = 'commerce_order';
+    $view->human_name = 'User orders';
+    $view->core = 7;
+    $view->api_version = '3.0';
+    $view->disabled = FALSE; /* Edit this to true to make a default view disabled initially */
+
+    /* Display: Defaults */
+    $handler = $view->new_display('default', 'Defaults', 'default');
+    $handler->display->display_options['title'] = 'Orders';
+    $handler->display->display_options['use_more_always'] = FALSE;
+    $handler->display->display_options['access']['type'] = 'perm';
+    $handler->display->display_options['access']['perm'] = 'view own commerce_order entities';
+    $handler->display->display_options['cache']['type'] = 'none';
+    $handler->display->display_options['query']['type'] = 'views_query';
+    $handler->display->display_options['query']['options']['query_comment'] = FALSE;
+    $handler->display->display_options['exposed_form']['type'] = 'basic';
+    $handler->display->display_options['pager']['type'] = 'full';
+    $handler->display->display_options['pager']['options']['items_per_page'] = 25;
+    $handler->display->display_options['style_plugin'] = 'table';
+    $handler->display->display_options['style_options']['columns'] = array(
+      'order_number' => 'order_number',
+      'created' => 'created',
+      'line_item_title' => 'line_item_title',
+      'commerce_order_total' => 'commerce_order_total',
+      'status' => 'status',
+      'order_number_1' => 'order_number_1',
+    );
+    $handler->display->display_options['style_options']['default'] = '-1';
+    $handler->display->display_options['style_options']['info'] = array(
+      'order_number' => array(
+        'sortable' => 1,
+        'default_sort_order' => 'desc',
+        'align' => '',
+        'separator' => '',
+        'empty_column' => 0,
+      ),
+      'created' => array(
+        'sortable' => 1,
+        'default_sort_order' => 'desc',
+        'align' => '',
+        'separator' => '',
+        'empty_column' => 0,
+      ),
+      'line_item_title' => array(
+        'align' => '',
+        'separator' => '',
+        'empty_column' => 0,
+      ),
+      'commerce_order_total' => array(
+        'sortable' => 0,
+        'default_sort_order' => 'asc',
+        'align' => '',
+        'separator' => '',
+        'empty_column' => 0,
+      ),
+      'status' => array(
+        'sortable' => 1,
+        'default_sort_order' => 'asc',
+        'align' => '',
+        'separator' => '',
+        'empty_column' => 0,
+      ),
+      'order_number_1' => array(
+        'sortable' => 0,
+        'default_sort_order' => 'asc',
+        'align' => '',
+        'separator' => '',
+        'empty_column' => 0,
+      ),
+    );
+    /* No results behavior: Global: Text area */
+    $handler->display->display_options['empty']['text']['id'] = 'text';
+    $handler->display->display_options['empty']['text']['table'] = 'views';
+    $handler->display->display_options['empty']['text']['field'] = 'area';
+    $handler->display->display_options['empty']['text']['content'] = 'You have not placed any orders with us yet.';
+    $handler->display->display_options['empty']['text']['format'] = 'plain_text';
+    /* Field: Commerce Order: Order number */
+    $handler->display->display_options['fields']['order_number']['id'] = 'order_number';
+    $handler->display->display_options['fields']['order_number']['table'] = 'commerce_order';
+    $handler->display->display_options['fields']['order_number']['field'] = 'order_number';
+    /* Field: Commerce Order: Created date */
+    $handler->display->display_options['fields']['created']['id'] = 'created';
+    $handler->display->display_options['fields']['created']['table'] = 'commerce_order';
+    $handler->display->display_options['fields']['created']['field'] = 'created';
+    $handler->display->display_options['fields']['created']['label'] = 'Created';
+    /* Field: Commerce order: Order product node */
+    $handler->display->display_options['fields']['order_product_node']['id'] = 'order_product_node';
+    $handler->display->display_options['fields']['order_product_node']['table'] = 'commerce_order';
+    $handler->display->display_options['fields']['order_product_node']['field'] = 'order_product_node';
+    $handler->display->display_options['fields']['order_product_node']['label'] = 'Product';
+    /* Field: Commerce Order: Order total */
+    $handler->display->display_options['fields']['commerce_order_total']['id'] = 'commerce_order_total';
+    $handler->display->display_options['fields']['commerce_order_total']['table'] = 'field_data_commerce_order_total';
+    $handler->display->display_options['fields']['commerce_order_total']['field'] = 'commerce_order_total';
+    $handler->display->display_options['fields']['commerce_order_total']['label'] = 'Total';
+    $handler->display->display_options['fields']['commerce_order_total']['click_sort_column'] = 'amount';
+    $handler->display->display_options['fields']['commerce_order_total']['settings'] = array(
+      'calculation' => FALSE,
+    );
+    /* Field: Commerce Order: Order status */
+    $handler->display->display_options['fields']['status']['id'] = 'status';
+    $handler->display->display_options['fields']['status']['table'] = 'commerce_order';
+    $handler->display->display_options['fields']['status']['field'] = 'status';
+    /* Field: Commerce Order: Order number */
+    $handler->display->display_options['fields']['order_number_1']['id'] = 'order_number_1';
+    $handler->display->display_options['fields']['order_number_1']['table'] = 'commerce_order';
+    $handler->display->display_options['fields']['order_number_1']['field'] = 'order_number';
+    $handler->display->display_options['fields']['order_number_1']['label'] = 'Actions';
+    $handler->display->display_options['fields']['order_number_1']['alter']['alter_text'] = TRUE;
+    $handler->display->display_options['fields']['order_number_1']['alter']['text'] = 'view';
+    $handler->display->display_options['fields']['order_number_1']['link_to_order'] = 'customer';
+    /* Contextual filter: Commerce Order: Uid */
+    $handler->display->display_options['arguments']['uid_1']['id'] = 'uid_1';
+    $handler->display->display_options['arguments']['uid_1']['table'] = 'commerce_order';
+    $handler->display->display_options['arguments']['uid_1']['field'] = 'uid';
+    $handler->display->display_options['arguments']['uid_1']['default_action'] = 'access denied';
+    $handler->display->display_options['arguments']['uid_1']['default_argument_type'] = 'fixed';
+    $handler->display->display_options['arguments']['uid_1']['summary']['number_of_records'] = '0';
+    $handler->display->display_options['arguments']['uid_1']['summary']['format'] = 'default_summary';
+    $handler->display->display_options['arguments']['uid_1']['summary_options']['items_per_page'] = '25';
+    $handler->display->display_options['arguments']['uid_1']['specify_validation'] = TRUE;
+    $handler->display->display_options['arguments']['uid_1']['validate']['type'] = 'current_user_or_role';
+    $handler->display->display_options['arguments']['uid_1']['validate_options']['restrict_roles'] = TRUE;
+    $handler->display->display_options['arguments']['uid_1']['validate_options']['roles'] = array(
+      3 => '3',
+    );
+    /* Filter criterion: Commerce Order: Order state */
+    $handler->display->display_options['filters']['state']['id'] = 'state';
+    $handler->display->display_options['filters']['state']['table'] = 'commerce_order';
+    $handler->display->display_options['filters']['state']['field'] = 'state';
+    $handler->display->display_options['filters']['state']['operator'] = 'not in';
+    $handler->display->display_options['filters']['state']['value'] = array(
+      'cart' => 'cart',
+      'checkout' => 'checkout',
+    );
+
+    /* Display: User Orders */
+    $handler = $view->new_display('page', 'User Orders', 'order_page');
+    $handler->display->display_options['path'] = 'user/%/orders';
+    $handler->display->display_options['menu']['type'] = 'tab';
+    $handler->display->display_options['menu']['title'] = 'Orders';
+    $handler->display->display_options['menu']['weight'] = '15';
+    $handler->display->display_options['tab_options']['type'] = 'normal';
+    $handler->display->display_options['tab_options']['title'] = 'Orders';
+    $handler->display->display_options['tab_options']['description'] = 'User orders in the store.';
+    $handler->display->display_options['tab_options']['weight'] = '';
+    $handler->display->display_options['tab_options']['name'] = 'user-menu';
+
+    $views['commerce_user_orders'] = $view;
+  }
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function idevels_subscription_commerce_views_api() {
+  return array(
+    'api' => 3.0,
+  );
+}
+
+/**
+ * Implements hook_views_data().
+ */
+function idevels_subscription_commerce_views_data() {
+  $data['subscription_access']['subscription_pick'] = array(
+    'group' => t('Pick'),
+    'real field' => 'sid',
+    'field' => array(
+      'title' => t('Pick title'),
+      'help' => t('Subscription pick title'),
+      'handler' => 'idevels_sc_handler_subscription_pick',
+    ),
+  );
+  $data['commerce_order']['order_product_node'] = array(
+    'group' => t('Commerce order'),
+    'real field' => 'order_id',
+    'field' => array(
+      'title' => t('Order product node'),
+      'help' => t('Node from order'),
+      'handler' => 'idevels_sc_handler_order_product_node',
+    ),
+  );
+  return $data;
+}
+
+/**
+ * Implements hook_views_query_alter().
+ */
+function idevels_subscription_commerce_views_query_alter(&$view, &$query) {
+  if ($view->name == 'picks' && $view->current_display == 'page_user_picks') {
+    $usr = (arg(0) == 'user') ? user_load(arg(1)) : user_load(0);
+
+    $access = new SubscriptionAccessClass($usr);
+    $subs_accesses = $access->getSubscriptions(IDEVELS_SUBSCRIPTION_ACCESS_ACTIVE);
+    $free_accesses = $access->getFreeSubscription(IDEVELS_SUBSCRIPTION_ACCESS_ACTIVE);
+    $all_picks = node_load_multiple(array(), array('type' => 'pick'));
+    $nids = array(0);
+    $available_types = array();
+
+    if (!empty($subs_accesses)) {
+      // Show nodes user bought.
+      foreach ($subs_accesses as $sub_access) {
+        $sid = $sub_access->sid;
+        if ($sub_access->sid == IDEVELS_SUBSCRIPTION_NODE_TYPE_SID && $sub_access->nid) {
+          $nids[$sub_access->nid] = $sub_access->nid;
+        }
+      }
+      foreach ($all_picks as $pick) {
+        $wrapper = entity_metadata_wrapper('node', $pick);
+        $pick_plans = $wrapper->field_pick_plan->value();
+        if (!is_array($pick_plans) || empty($pick_plans)) {
+          continue;
+        }
+        // Show nodes with free access if user has free subscription access
+        // and nodes user has access with bought subscriptions.
+        if ((in_array(IDEVELS_SUBSCRIPTION_FREE, $pick_plans) && !empty($free_accesses))
+        || (idevels_sa_pick_check($pick, $usr) === TRUE)) {
+          $nids[$pick->nid] = $pick->nid;
+        }
+      }
+    }
+
+    $query->where[] = array(
+      'conditions' => array(
+        0 => array(
+          'field' => 'node.nid',
+          'value' => $nids,
+          'operator' => 'in',
+        ),
+      ),
+      'type' => 'AND',
+    );
+  }
+}

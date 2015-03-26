@@ -1,0 +1,12 @@
+name = Idevels subscription commerce
+description = Main module for provide functionality for commerce.
+package = InternetDevels
+core = 7.x
+
+dependencies[] = idevels_subscription
+dependencies[] = idevels_subscription_access
+dependencies[] = rules
+dependencies[] = entity
+
+files[] = handlers/idevels_sc_handler_subscription_pick.inc
+files[] = handlers/idevels_sc_handler_order_product_node.inc

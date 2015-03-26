@@ -1,0 +1,17 @@
+name = Idevels subscription access
+description = Main module for provide functionality of access to picks nodes.
+package = InternetDevels
+core = 7.x
+
+dependencies[] = idevels_subscription
+dependencies[] = rules
+dependencies[] = elysia_cron
+
+files[] = includes/idevels_subscription_access.entity.inc
+files[] = includes/idevels_subscription_access.controller.inc
+files[] = includes/idevels_subscription_access.class.inc
+files[] = includes/idevels_subscription_access_views.controller.inc
+
+;handlers
+files[] = handlers/idevels_subscription_access_status_handler_field.inc
+files[] = handlers/idevels_subscription_access_handler_filter_boolean_operator.inc

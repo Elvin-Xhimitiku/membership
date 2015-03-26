@@ -1,0 +1,7 @@
+name = Idevels subscription node
+description = Module for provide functionality of buy pick separatly.
+package = InternetDevels
+core = 7.x
+
+dependencies[] = idevels_subscription
+dependencies[] = idevels_subscription_access

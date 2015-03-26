@@ -1,0 +1,378 @@
+<?php
+/**
+ * @file
+ * Main file of module.
+ */
+
+define('IDEVELS_SUBSCRIPTION_ACCESS_ACTIVE', 1);
+define('IDEVELS_SUBSCRIPTION_ACCESS_UNACTIVE', 0);
+
+
+/**
+ * Implements hook_menu().
+ */
+function idevels_subscription_access_menu() {
+  $items['admin/structure/subscription/config'] = array(
+    'title' => 'Configure access',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('idevels_subscription_access_access_config_page'),
+    'access arguments' => array('idevels sub access admin'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'idevels_subscription_access.admin.inc',
+    'weight' => 50,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_entity_info().
+ */
+function idevels_subscription_access_entity_info() {
+  return array(
+    'subscription_access' => array(
+      'label' => t('Subscription access'),
+      'entity class' => 'SubscriptionAccess',
+      'controller class' => 'SubscriptionAccessController',
+      'base table' => 'subscription_access',
+      'fieldable' => TRUE,
+      'views controller class' => 'IdevelsSubscriptionAccessViewsController',
+      'entity keys' => array(
+        'id' => 'said',
+      ),
+      'access callback' => 'idevels_subscription_access_subscription_access',
+      'bundles' => array(),
+      'module' => 'idevels_subscription_access',
+    ),
+  );
+}
+
+/**
+ * Implements hook_entity_property_info().
+ */
+function idevels_subscription_access_entity_property_info() {
+  $info = array();
+  // Add meta-data about the basic subscription_access properties.
+  $properties = &$info['subscription_access']['properties'];
+  $properties['said'] = array(
+    'label' => t('Subscription access ID'),
+    'type' => 'integer',
+    'description' => t('Subscription access ID.'),
+    'schema field' => 'said',
+    'required' => TRUE,
+  );
+  $properties['sid'] = array(
+    'label' => t('Subscription ID'),
+    'type' => 'integer',
+    'description' => t('Subscription ID.'),
+    'schema field' => 'sid',
+    'required' => TRUE,
+  );
+  $properties['uid'] = array(
+    'label' => t('User ID'),
+    'type' => 'user',
+    'description' => t('User ID.'),
+    'schema field' => 'uid',
+    'required' => TRUE,
+  );
+  $properties['status'] = array(
+    'label' => t('Status'),
+    'type' => 'integer',
+    'description' => t('Can be 1 or 0.'),
+    'schema field' => 'status',
+    'required' => TRUE,
+  );
+  $properties['start_date'] = array(
+    'label' => t('Start date'),
+    'type' => 'integer',
+    'description' => t('Unix timestamp.'),
+    'schema field' => 'start_date',
+    'required' => TRUE,
+  );
+  $properties['end_date'] = array(
+    'label' => t('End date'),
+    'type' => 'integer',
+    'description' => t('Unix timestamp.'),
+    'schema field' => 'end_date',
+    'required' => TRUE,
+  );
+
+  $properties['order_id'] = array(
+    'label' => t('Order ID'),
+    'type' => 'commerce_order',
+    'description' => t('From commerce module.'),
+    'schema field' => 'order_id',
+    'required' => FALSE,
+  );
+
+  $properties['nid'] = array(
+    'label' => t('Node ID'),
+    'type' => 'node',
+    'description' => t('Node ID.'),
+    'schema field' => 'nid',
+    'required' => FALSE,
+  );
+
+  return $info;
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function idevels_subscription_access_views_api() {
+  return array(
+    'api' => 3.0,
+  );
+}
+
+/**
+ * Access callback for subscription entity.
+ */
+function idevels_subscription_access_subscription_access($op, $task, $account = NULL, $entity_type = NULL) {
+  return TRUE;
+}
+
+/**
+ * Load a subscription access.
+ */
+function subscription_access_load($said, $reset = FALSE) {
+  $subscriptions_access = subscription_access_load_multiple(array($said), array(), $reset);
+  return reset($subscriptions_access);
+}
+
+/**
+ * Load a subscription access multiple.
+ */
+function subscription_access_load_multiple($saids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('subscription_access', $saids, $conditions, $reset);
+}
+
+/**
+ * Save subscription access.
+ */
+function subscription_access_save($subscription_access) {
+  entity_save('subscription_access', $subscription_access);
+}
+
+/**
+ * Implements hook_permission().
+ */
+function idevels_subscription_access_permission() {
+  return array(
+    'idevels sub access bypass' => array(
+      'title' => t('Access to picks nodes bypass'),
+    ),
+    'idevels sub access admin' => array(
+      'title' => t('Access to config module page'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_access().
+ */
+function idevels_subscription_access_field_access($op, $field, $entity_type, $entity, $account) {
+  if ('view' == $op && 'node' == $entity_type && !empty($entity->type) && IDEVELS_SUBSCRIPTION_CONTENT_TYPE == $entity->type) {
+    $fields_access = array_values(variable_get('idevels_sub_access_fields_view', array()));
+    $fields_access = array_filter($fields_access, function($var) {
+      return !empty($var);
+    });
+    $access = idevels_subscription_access_is_node_access_deny($entity);
+    if ($access && in_array($field['field_name'], $fields_access)) {
+      return FALSE;
+    }
+  }
+  return TRUE;
+}
+
+/**
+ * Function for check node for access deny.
+ */
+function idevels_subscription_access_is_node_access_deny($node) {
+  $result = &drupal_static(__FUNCTION__);
+  if (isset($result)) {
+    return $result;
+  }
+  $result = TRUE;
+  $accesses = module_invoke_all('idevels_subscription_access_list');
+  foreach ($accesses as $access_name => $data) {
+    $function = $data['check callback'];
+    $access = $function($node);
+    if (TRUE === $access) {
+      $result = FALSE;
+      break;
+    }
+  }
+  return $result;
+}
+
+/**
+ * Implements hook_idevels_subscription_access_list().
+ */
+function idevels_subscription_access_idevels_subscription_access_list() {
+  return array(
+    'free_access' => array(
+      'title' => t('Free access'),
+      'check callback' => 'idevels_subscription_access_free_check',
+    ),
+  );
+}
+
+/**
+ * Implements hook_node_view().
+ */
+function idevels_subscription_access_node_view($node, $view_mode, $langcode) {
+  if (IDEVELS_SUBSCRIPTION_CONTENT_TYPE != $node->type) {
+    return;
+  }
+  if (idevels_subscription_access_is_node_access_deny($node)) {
+    $node->content['access_deny'] = array(
+      '#type' => 'container',
+      '#attributes' => array('class' => array('pick-deny-wrapp')),
+      '#weight' => -99,
+    );
+    $node->content['access_deny']['text'] = array(
+      '#theme' => 'html_tag',
+      '#tag' => 'strong',
+      '#value' => t("You don't have a full access to this pick."),
+    );
+  }
+}
+
+/**
+ * Function for check free access.
+ */
+function idevels_subscription_access_free_check($node) {
+  global $user;
+  if (user_access('idevels sub access bypass')) {
+    return TRUE;
+  }
+  $account = user_load($user->uid);
+  // Checking selected free plan in node.
+  $wrapper = entity_metadata_wrapper('node', $node);
+  $field = $wrapper->field_pick_plan->value();
+  if (!is_array($field) || !in_array(IDEVELS_SUBSCRIPTION_FREE, $field)) {
+    return FALSE;
+  }
+  // Checking access to free plan.
+  $access = new SubscriptionAccessClass($account);
+  $subscription = $access->getFreeSubscription();
+  if (!empty($subscription) && $access->isSubscriptionActive(reset($subscription))) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
+ * Implements hook_cronapi().
+ */
+function idevels_subscription_access_cronapi() {
+  $items = array();
+
+  $items['idevels_sub_acs_check_all'] = array(
+    'description' => t('Check all subscriptions, and deactivate if need.'),
+    'callback' => 'idevels_sub_acs_check_all_cron_callback',
+    'rule' => '*/30 * * * *',
+    'arguments' => array(),
+    'file' => 'idevels_subscription_access.cron.inc',
+    'file path' => drupal_get_path('module', 'idevels_subscription_access'),
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_init().
+ */
+function idevels_subscription_access_init() {
+
+}
+
+/**
+ * Implements hook_user_delete().
+ */
+function idevels_subscription_access_user_delete($account) {
+  // Remove subscriptions access if we delete user account.
+  db_delete('subscription_access')
+    ->condition('uid', $account->uid)
+    ->execute();
+}
+
+/**
+ * Function returns time + 1 month.
+ */
+function idevels_sa_get_date_plus_month($time) {
+  return strtotime('+1 month', $time);
+}
+
+/**
+ * Checking access to nodes.
+ */
+function idevels_sa_pick_check($node, $usr) {
+  $account = user_load($usr->uid);
+  if (user_access('idevels sub access bypass', $account)) {
+    return TRUE;
+  }
+  $wrapper = entity_metadata_wrapper('node', $node);
+  $pick_types = $wrapper->field_pick_plan->value();
+  if (!is_array($pick_types) || empty($pick_types)) {
+    return FALSE;
+  }
+
+  // Getting all categories from pick.
+  $pick_categories = array();
+  $categories = $wrapper->field_pick_category->value();
+  foreach ($categories as $pick_categ) {
+    $pick_categories[] = $pick_categ->tid;
+  }
+  $highest_plan = max($pick_types);
+
+  $access = new SubscriptionAccessClass($account);
+  $subs_accesses = $access->getSubscriptions(IDEVELS_SUBSCRIPTION_ACCESS_ACTIVE);
+  if (empty($subs_accesses)) {
+    return FALSE;
+  }
+  if (in_array(IDEVELS_SUBSCRIPTION_FREE, $pick_types)) {
+    return TRUE;
+  }
+  $types = array();
+  $user_plan_categories = array();
+  // Getting pick plan types and categories from user's plans.
+  foreach ($subs_accesses as $sub_access) {
+    $sid = $sub_access->sid;
+    if ($sid != 0) {
+      $subscription = entity_load('subscription', array($sid));
+      if (isset($subscription[$sid]) && $subscription[$sid]->type < IDEVELS_SUBSCRIPTION_FREE) {
+        $types[] = $subscription[$sid]->type;
+        $user_plan_categories[] = $subscription[$sid]->category;
+      }
+    }
+  }
+
+  // Checking if user has access to pick's category.
+  $category_access = FALSE;
+  foreach ($pick_categories as $node_category) {
+    $category_access = in_array($node_category, $user_plan_categories) ? TRUE : FALSE;
+    if ($category_access) {
+      break;
+    }
+  }
+  if (!$category_access) {
+    return FALSE;
+  }
+
+  $highest_access = max($types);
+  // User has not access to not free node when he has only free plan.
+  if (in_array(IDEVELS_SUBSCRIPTION_FREE, $types) && count($types) == 1) {
+    return FALSE;
+  }
+
+  // Pick with free plans are available to users who have
+  // either free or any other plan.
+  if (($highest_plan == IDEVELS_SUBSCRIPTION_FREE)
+    // User has access if he has higher plan that a node has except free.
+    || ($highest_access >= $highest_plan)) {
+    return TRUE;
+  }
+
+  return FALSE;
+}

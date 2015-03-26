@@ -1,0 +1,13 @@
+name = Pick view feature
+core = 7.x
+package = Features
+dependencies[] = better_exposed_filters
+dependencies[] = entity
+dependencies[] = idevels_pick_view
+dependencies[] = rules
+dependencies[] = views
+features[ctools][] = views:views_default:3.0
+features[features_api][] = api:2
+features[rules_config][] = rules_idevels_pick_view
+features[views_view][] = pick_view_reports
+features_exclude[dependencies][ctools] = ctools

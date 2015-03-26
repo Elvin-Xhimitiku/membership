@@ -1,0 +1,44 @@
+<?php
+/**
+ * @file
+ * Install file of module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function idevels_pick_view_schema() {
+  $schema['pick_view'] = array(
+    'description' => 'Pick view reports',
+    'fields' => array(
+      'rid' => array(
+        'description' => 'Report ID.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'nid' => array(
+        'description' => 'Node ID of Pick type.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'uid' => array(
+        'description' => 'User ID.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'access' => array(
+        'description' => 'Special column for write access status for pick.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'time' => array(
+        'description' => 'Unix timestamp.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('rid'),
+  );
+  return $schema;
+}

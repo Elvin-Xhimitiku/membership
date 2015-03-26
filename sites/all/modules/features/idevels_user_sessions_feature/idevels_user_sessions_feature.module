@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the Idevels user sessions feature feature.
+ */
+
+include_once 'idevels_user_sessions_feature.features.inc';

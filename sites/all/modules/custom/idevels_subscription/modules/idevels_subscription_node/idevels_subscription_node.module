@@ -1,0 +1,172 @@
+<?php
+/**
+ * @file
+ * Main file of module.
+ */
+
+define('IDEVELS_SUBSCRIPTION_NODE_TYPE', 5);
+define('IDEVELS_SUBSCRIPTION_NODE_TYPE_SID', idevels_subscription_node_get_sid());
+
+/**
+ * Implements hook_permission().
+ */
+function idevels_subscription_node_permission() {
+  return array(
+    'idevels sub node access bypass' => array(
+      'title' => t('Access to view pick node separatly'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function idevels_subscription_node_form_pick_node_form_alter(&$form, &$form_state) {
+  $form['#validate'][] = 'idevels_subscription_node_amount_node_validate';
+}
+
+/**
+ * Validation for pick node form.
+ */
+function idevels_subscription_node_amount_node_validate($form, &$form_state) {
+  $values = $form_state['values'];
+  $buy_separatly = $values['field_buy_separately'][LANGUAGE_NONE][0]['value'];
+  if (!empty($buy_separatly)) {
+    $price = $values['field_price'][LANGUAGE_NONE][0]['amount'];
+    if (empty($price)) {
+      form_set_error('field_price', t('Please, enter a price.'));
+    }
+  }
+}
+
+/**
+ * Function for return subscription id for buy node pick.
+ */
+function idevels_subscription_node_get_sid() {
+  $sid = &drupal_static(__FUNCTION__);
+  if (empty($sid)) {
+    $sid = db_query("SELECT sid FROM {subscription} WHERE type = :type", array(':type' => IDEVELS_SUBSCRIPTION_NODE_TYPE))->fetchCol();
+    if (!empty($sid)) {
+      $sid = reset($sid);
+    }
+  }
+  return $sid;
+}
+
+
+/**
+ * Implements hook_rules_action_info().
+ */
+function idevels_subscription_node_rules_action_info() {
+  return array(
+    'idevels_subscription_node_buy_action' => array(
+      'label' => t('Set access for node'),
+      'group' => t('IDevels'),
+      'parameter' => array(
+        'commerce_order' => array(
+          'type' => 'commerce_order',
+          'label' => t('Commerce Order'),
+        ),
+        'product_sku' => array(
+          'type' => 'text',
+          'label' => t('Product SKU'),
+          'description' => t('The SKU of the product.'),
+        ),
+      ),
+    ),
+  );
+}
+
+/**
+ * Action callback for rule.
+ */
+function idevels_subscription_node_buy_action($commerce_order, $product_sku) {
+  global $user;
+  $account = user_load($user->uid);
+  $order_id = $commerce_order->order_id;
+  preg_match('/^pick\-(\d+)$/', $product_sku, $matches);
+  if (empty($matches[1]) || !ctype_digit($matches[1])) {
+    drupal_set_message(t('An illegal choice has been detected. Please contact the site administrator.'), 'error');
+    return;
+  }
+  $node_id = $matches[1];
+
+  $controller = entity_get_controller('subscription_access');
+  $subscription_access = $controller->create(array(
+    'sid' => IDEVELS_SUBSCRIPTION_NODE_TYPE_SID,
+    'uid' => $account->uid,
+    'status' => IDEVELS_SUBSCRIPTION_ACCESS_ACTIVE,
+    'start_date' => REQUEST_TIME,
+    'end_date' => 0,
+    'nid' => $node_id,
+    'order_id' => $order_id,
+  ));
+  if ($status = $controller->save($subscription_access)) {
+    return TRUE;
+  }
+  else {
+    throw new Exception('Unable to set access for pick.');
+  }
+
+}
+
+/**
+ * Implements hook_idevels_subscription_access_list().
+ */
+function idevels_subscription_node_idevels_subscription_access_list() {
+  return array(
+    'pick_access' => array(
+      'title' => t('Separatly access to pick'),
+      'check callback' => 'idevels_subscription_node_check_callback',
+    ),
+  );
+}
+
+/**
+ * Function for check pick access.
+ */
+function idevels_subscription_node_check_callback($node) {
+  global $user;
+  if (user_access('idevels sub node access bypass')) {
+    return TRUE;
+  }
+  $query = db_select('subscription_access', 'sa');
+  $query->join(
+    'subscription',
+    's',
+    'sa.sid = s.sid AND s.type = :type',
+    array(':type' => IDEVELS_SUBSCRIPTION_NODE_TYPE)
+  );
+  $query
+    ->condition('sa.uid', $user->uid)
+    ->condition('sa.status', IDEVELS_SUBSCRIPTION_ACCESS_ACTIVE)
+    ->condition('sa.nid', $node->nid)
+    ->condition(db_or()
+    ->condition('sa.end_date', 0)
+    ->condition('sa.end_date', REQUEST_TIME, '>=')
+    );
+  $query->fields('sa', array('said'));
+  $result = $query->execute();
+  return (bool) $result->fetchField();
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function idevels_subscription_node_form_alter(&$form, &$form_state, $form_id) {
+  $page_node = menu_get_object();
+  $regexp = '/^commerce_cart_add_to_cart_form_\d+$/';
+  if (preg_match($regexp, $form_id) && !empty($page_node->type) && IDEVELS_SUBSCRIPTION_CONTENT_TYPE == $page_node->type) {
+    if (idevels_subscription_node_check_callback($page_node)) {
+      $form['submit']['#access'] = FALSE;
+      $form['already_buy'] = array(
+        '#theme' => 'html_tag',
+        '#tag' => 'div',
+        '#value' => t('You have bought this pick.'),
+        '#attributes' => array(
+          'class' => array('pick-alredy-buy'),
+        ),
+      );
+    }
+  }
+}

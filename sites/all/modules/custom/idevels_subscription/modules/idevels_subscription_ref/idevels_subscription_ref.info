@@ -1,0 +1,8 @@
+name = Idevels subscription referral url
+description = Main module for provide functionality of referral urls.
+package = InternetDevels
+core = 7.x
+
+dependencies[] = idevels_subscription
+
+files[] = views/views_subscription_ref_handler_area_referral.inc

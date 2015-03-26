@@ -1,0 +1,123 @@
+<?php
+/**
+ * @file
+ * Install file of module.
+ */
+
+
+/**
+ * Implements hook_schema().
+ */
+function idevels_subscription_schema() {
+  $schema['subscription'] = array(
+    'description' => 'Subscription plans',
+    'fields' => array(
+      'sid' => array(
+        'description' => 'Subscription ID.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'description' => 'Name of subscription.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'type' => array(
+        'description' => 'Type of subscription.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'description' => array(
+        'description' => 'The description of subscription.',
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+      ),
+      'category' => array(
+        'description' => 'Taxonomy term id of category.',
+        'type' => 'int',
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'price' => array(
+        'description' => 'Price of subscription per mounth.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'updated' => array(
+        'description' => 'Updated date.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('sid'),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function idevels_subscription_install() {
+  $vocabulary = taxonomy_vocabulary_machine_name_load(IDEVELS_SUBSCRIPTION_CATEGORY_VOC);
+  $term1 = new stdClass();
+  $term1->name = 'Category 1';
+  $term1->vid = $vocabulary->vid;
+  $term2 = clone $term1;
+  $term2->name = 'Category 2';
+  taxonomy_term_save($term1);
+  taxonomy_term_save($term2);
+
+  $plans_info = array(
+    1 => array(
+      'name' => 'Regular',
+      'price' => 20,
+    ),
+    2 => array(
+      'name' => 'Standart',
+      'price' => 50,
+    ),
+    3 => array(
+      'name' => 'Premium',
+      'price' => 100,
+    ),
+  );
+
+  $transaction = db_transaction();
+  try {
+    // Inserting of free plan.
+    db_insert('subscription')
+    ->fields(array(
+      'name' => 'Free',
+      'type' => 4,
+      'price' => 0,
+      'updated' => REQUEST_TIME,
+    ))
+    ->execute();
+
+    for ($i = 1; $i <= 2; $i++) {
+      $term = ${"term{$i}"};
+      foreach ($plans_info as $plan_type => $data) {
+        db_insert('subscription')
+        ->fields(array(
+          'name' => $data['name'],
+          'type' => $plan_type,
+          'price' => $data['price'],
+          'updated' => REQUEST_TIME,
+          'category' => $term->tid,
+        ))
+        ->execute();
+      }
+    }
+
+  }
+  catch (Exception $e) {
+    $transaction->rollback();
+    drupal_set_message('Unable to load test content', 'error');
+    watchdog_exception('idevels_subscription', $e);
+  }
+
+}

@@ -1,0 +1,155 @@
+<?php
+
+/**
+ * @file
+ * Main file of module.
+ */
+
+define('REFERRAL_HEX_START', 7);
+define('REFERRAL_HEX_LENGTH', 4);
+// Days.
+define('REFERRAL_COOKIE_LIFETIME', 1);
+define('REFERRAL_URL_COOKIE', 'referral_url_cookie');
+
+/**
+ * Implements hook_menu().
+ */
+function idevels_subscription_ref_menu() {
+  $items = array();
+  $items['referral'] = array(
+    'page callback'    => 'idevels_subscription_referral_get',
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function idevels_subscription_ref_views_api() {
+  return array(
+    'api' => 3.0,
+    'path' => drupal_get_path('module', 'idevels_subscription_ref') . '/views',
+  );
+}
+
+/**
+ * Implements hook_views_data_alter().
+ */
+function idevels_subscription_ref_views_data_alter(&$data) {
+  $data['views']['user_referral_url'] = array(
+    'title' => t('User referral url'),
+    'help' => t('User referral url'),
+    'area' => array(
+      'handler' => 'views_subscription_ref_handler_area_referral',
+    ),
+  );
+}
+
+/**
+ * Implements hook_user_insert().
+ */
+function idevels_subscription_ref_user_insert(&$edit, $account, $category) {
+  idevels_sr_user_save($account);
+}
+
+/**
+ * Page callback for referral page.
+ */
+function idevels_subscription_referral_get() {
+  global $user;
+  if (!$user->uid) {
+    $uid = idevels_sr_ref2uid(arg(1));
+    if (($uid) && is_numeric($uid)) {
+      idevels_sr_set_cookie($uid);
+    }
+    drupal_goto('user/register');
+  }
+  drupal_goto();
+}
+
+/**
+ * Converting referral url to uid.
+ */
+function idevels_sr_ref2uid($ref) {
+  if ($ref) {
+    if (is_numeric('0x' . $ref)) {
+      $uid = hexdec($ref) - idevels_sr_hex_seed();
+      return $uid;
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Converting uid to referral url.
+ */
+function idevels_sr_uid2ref($uid) {
+  if ($uid) {
+    if (is_numeric($uid)) {
+      $ref = dechex(idevels_sr_hex_seed() + $uid);
+      return $ref;
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Decoding base_url for referral url.
+ */
+function idevels_sr_hex_seed() {
+  global $base_url;
+  $seed = hexdec(idevels_sr_asc2hex(substr($base_url, REFERRAL_HEX_START, REFERRAL_HEX_LENGTH)));
+  return $seed;
+}
+
+/**
+ * Decoding string to hex format.
+ */
+function idevels_sr_asc2hex($asc_str) {
+  $hex_str = '';
+  for ($i = 0; $i < drupal_strlen($asc_str); $i++) {
+    $hex_str .= sprintf("%02x", ord(substr($asc_str, $i, 1)));
+  }
+  return $hex_str;
+}
+
+/**
+ * Setting cookie.
+ */
+function idevels_sr_set_cookie($uid) {
+  $cookie = array(
+    'uid'       => $uid,
+    'timestamp' => time(),
+    'ip'        => ip_address(),
+    'referer'   => $_SERVER['HTTP_REFERER'],
+  );
+  $cookie_lifetime = REFERRAL_COOKIE_LIFETIME * 86400;
+  setcookie(REFERRAL_URL_COOKIE, serialize($cookie), time() + $cookie_lifetime, '/');
+}
+
+/**
+ * Saving new user and writting its uid to referral user's field.
+ */
+function idevels_sr_user_save($account) {
+  $uid = $account->uid;
+  if (!isset($_COOKIE[REFERRAL_URL_COOKIE])) {
+    return;
+  }
+
+  // Retrieve referral info from the cookie.
+  $cookie = unserialize($_COOKIE[REFERRAL_URL_COOKIE]);
+
+  if (empty($cookie)) {
+    // Nothing to do ...
+    return;
+  }
+
+  $referral_user = user_load($cookie['uid']);
+  if (!empty($referral_user)) {
+    $lang = field_language('user', $referral_user, 'field_referral_users');
+    $referral_user->field_referral_users[$lang][]['target_id'] = $account->uid;
+    user_save($referral_user);
+  }
+}

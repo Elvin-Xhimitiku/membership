@@ -1,0 +1,17 @@
+name = Idevels subscription
+description = Main module with subscription entity.
+package = InternetDevels
+core = 7.x
+
+dependencies[] = entity
+dependencies[] = commerce
+dependencies[] = views
+dependencies[] = taxonomy
+dependencies[] = pick_content_type_feature
+
+files[] = includes/idevels_subscription.entity.inc
+files[] = includes/idevels_subscription.controller.inc
+files[] = includes/idevels_subscription_views.controller.inc
+
+;handlers
+files[] = handlers/idevels_subscription_category_handler_field.inc

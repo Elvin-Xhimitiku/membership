@@ -1,0 +1,74 @@
+<?php
+/**
+ * @file
+ * Main file of module.
+ */
+
+/**
+ * Implements hook_entity_info().
+ */
+function idevels_pick_view_entity_info() {
+  return array(
+    'pick_view' => array(
+      'label' => t('Idevels pick view'),
+      'entity class' => 'PickView',
+      'controller class' => 'PickViewController',
+      'base table' => 'pick_view',
+      'fieldable' => TRUE,
+      'views controller class' => 'PickViewViewsController',
+      'entity keys' => array(
+        'id' => 'rid',
+      ),
+      'access callback' => 'idevels_pick_view_pick_view_access',
+      'bundles' => array(),
+      'module' => 'idevels_pick_view',
+    ),
+  );
+}
+
+/**
+ * Implements hook_entity_property_info().
+ */
+function idevels_pick_view_entity_property_info() {
+  $info = array();
+  // Add meta-data about the basic pick_view properties.
+  $properties = &$info['pick_view']['properties'];
+  $properties['rid'] = array(
+    'label' => t('Report ID'),
+    'type' => 'integer',
+    'description' => t('Report ID.'),
+    'schema field' => 'rid',
+  );
+  $properties['nid'] = array(
+    'label' => t('Node ID'),
+    'type' => 'integer',
+    'description' => t('Node ID.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'required' => TRUE,
+    'schema field' => 'nid',
+  );
+  $properties['uid'] = array(
+    'label' => t('User ID'),
+    'type' => 'integer',
+    'description' => t('User ID.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'required' => TRUE,
+    'schema field' => 'uid',
+  );
+  $properties['access'] = array(
+    'label' => t('Access state'),
+    'type' => 'integer',
+    'description' => t('Access state. 1 if user had access else 0.'),
+    'setter callback' => 'entity_property_verbatim_set',
+    'schema field' => 'access',
+    'required' => TRUE,
+  );
+  return $info;
+}
+
+/**
+ * Access callback for subscription entity.
+ */
+function idevels_pick_view_pick_view_access($op, $task, $account = NULL, $entity_type = NULL) {
+  return TRUE;
+}

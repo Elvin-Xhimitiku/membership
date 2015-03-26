@@ -1,0 +1,8 @@
+name = Idevels subscription report delete
+description = module provide functionality for delete old reports.
+core = 7.x
+package = InternetDevels
+
+dependencies[] = idevels_user_sessions
+dependencies[] = idevels_pick_view
+dependencies[] = elysia_cron

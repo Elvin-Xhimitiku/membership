@@ -1,0 +1,14 @@
+name = Idevels user sessions feature
+description = User sessions rule and view
+core = 7.x
+package = Features
+dependencies[] = better_exposed_filters
+dependencies[] = idevels_user_sessions
+dependencies[] = rules
+dependencies[] = views
+features[ctools][] = views:views_default:3.0
+features[features_api][] = api:2
+features[rules_config][] = rules_idevels_user_last_access
+features[views_view][] = user_sessions
+features_exclude[dependencies][ctools] = ctools
+features_exclude[dependencies][entity] = entity
